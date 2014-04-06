@@ -176,6 +176,10 @@ namespace LineryBinaryCode
             {
                 return source.Length;
             }
+            set
+            {
+                source.Length = value;
+            }
         }
 
         public byte[] ToArrayBytes()

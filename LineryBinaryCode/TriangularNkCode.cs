@@ -19,76 +19,77 @@ namespace LineryBinaryCode
 
         public override BitNumber Generate(BitNumber message)
         {
-            byte[] result = null;
-            byte[] messageInBytes = message.ToArrayBytes();
+            BitNumber[] triangle = null;
             int diagonalSize;
             try
             {
-                diagonalSize = getLengthAddedDiagonal(message.Length);
-                result = new byte[ diagonalSize + message.Length];
+                diagonalSize = getLengthAddedDiagonal(message.Length) - 1;
+                triangle = new BitNumber[diagonalSize + 1]; //+1 на проверку первого столба
             }
             catch (ImpossibleBuildTriangularException)
             {
                 throw new ImpossibleBuildTriangularException("Incorrect size message for this method!");
             }
 
-            byte[][] triangleLine = new byte[diagonalSize][];
-            for (int lineSize = diagonalSize, i = 0, startLine = 0; lineSize > 0 && startLine < message.Length; lineSize--, i++)
+            //Генерация треугольника
+            for (int i = 0, start = 0, lengthLine = diagonalSize; i < diagonalSize; lengthLine--, i++)
             {
-                triangleLine[i] = new byte[lineSize];
-                Array.Copy(messageInBytes, startLine, triangleLine[i], 0, lineSize - 1);
-                startLine += (lineSize - 1);
-                triangleLine[i][lineSize - 1] = (!checkOnParity(triangleLine[i])) ? (byte)1 : (byte)0;
+                triangle[i] = new BitNumber(message, start, start + lengthLine - 1);
+                start += lengthLine;
             }
 
-            //check by first column
-            int countOneByFirstColumn = 0;
-            for (int i = 0; i < diagonalSize - 1; i++)
+            //Установка проверочного в каждой строке
+            for (int i = 0; i < diagonalSize; i++)
             {
-                if (triangleLine[i][0] > 0)
+                int countOnesByRow = 0;
+                for (int j = 0; j > i; j++)
                 {
-                    countOneByFirstColumn++;
+                    if (triangle[j][triangle[i].Length] == true)
+                    {
+                        countOnesByRow++;
+                    }
+                }
+                bool ckeckedBit = triangle[i].IsParity == (countOnesByRow % 2 == 0);
+                triangle[i].PushBack(ckeckedBit);
+            }
+
+            //проверка первого столбца
+            int onesByFirstRow = 0;
+            for (int i = 0; i < triangle.Length - 1; i++)
+            {
+                if (triangle[i][0] == true)
+                {
+                    onesByFirstRow++;
                 }
             }
-            triangleLine[diagonalSize - 1] = new byte[1];
-            triangleLine[diagonalSize - 1][0] = (byte)(countOneByFirstColumn % 2);
+            triangle[triangle.Length - 1][0] = (onesByFirstRow % 2 == 0);
 
-            //Split in triangle in result
-            for (int i = 0, startInResult = 0; i < triangleLine.Length; i++)
-            {
-                Array.Copy(triangleLine[i], 0, result, startInResult, triangleLine[i].Length);
-                startInResult += triangleLine[i].Length;
-            }
-            
-            return new BitNumber(result);
+            return BitNumber.Split(triangle);
         }
 
         public override BitNumber Decode(BitNumber codeWord)
         {
-            byte[] result = null;
-            byte[] codeWordBytes = codeWord.ToArrayBytes();
+            BitNumber result = null;
             if (isPossibleBuildTriangular(codeWord.Length))
             {
                 int diagonalSize = getLengthDiagonal(codeWord.Length);
-                result = new byte[codeWord.Length - diagonalSize];
-                int countErrors = 0;
-                for (int startTriangleLine = 0, lineSize = diagonalSize, i = 0; lineSize > 0 ; lineSize--)
+                BitNumber[] triangle = messageToTriangle(codeWord);
+                //Создаём исходную матрицу (если не было ошибки)
+                BitNumber[] sourceTriange = new BitNumber[triangle.Length - 1];
+                Array.Copy(triangle, sourceTriange, sourceTriange.Length);
+                for (int i = 0; i < sourceTriange.Length; i++)
                 {
-                    byte[] temp = new byte[lineSize];
-                    Array.Copy(codeWordBytes, temp, lineSize);
-                    startTriangleLine += lineSize;
-
-                    if (!checkOnParity(temp))
-                    {
-                        countErrors++;
-                    }
-                    Array.Copy(temp, 0, result, i, temp.Length-1);
-                    i += temp.Length;
+                    sourceTriange[i].Length--;
                 }
 
-                if (countErrors > 0)
+                BitNumber maybeCodeWord = Generate(BitNumber.Split(sourceTriange));
+                if (codeWord.Equals(maybeCodeWord))
                 {
-                    throw new DecodeErorr("Triangular decode was fail!", countErrors);
+                    result = BitNumber.Split(sourceTriange);
+                }
+                else //возникла ошибка
+                {
+
                 }
             }
             else
@@ -96,7 +97,7 @@ namespace LineryBinaryCode
                 throw new ImpossibleBuildTriangularException("Impossible build triangular!");
             }
 
-            return new BitNumber(result);
+            return result;
         }
 
         public bool isPossibleBuildTriangular(int sizeMessage)
@@ -112,6 +113,30 @@ namespace LineryBinaryCode
             }
 
             return result;
+        }
+
+        private BitNumber[] messageToTriangle(BitNumber message)
+        {
+            BitNumber[] triangle = null;
+            int diagonalSize;
+            try
+            {
+                diagonalSize = getLengthAddedDiagonal(message.Length) - 1;
+                triangle = new BitNumber[diagonalSize];
+            }
+            catch (ImpossibleBuildTriangularException)
+            {
+                throw new ImpossibleBuildTriangularException("Incorrect size message for this method!");
+            }
+
+            //Генерация треугольника
+            for (int i = 0, start = 0, lengthLine = diagonalSize; i < diagonalSize; lengthLine--, i++)
+            {
+                triangle[i] = new BitNumber(message, start, start + lengthLine - 1);
+                start += lengthLine;
+            }
+
+            return triangle;
         }
 
         /// <summary>
@@ -135,6 +160,11 @@ namespace LineryBinaryCode
             return result;
         }
 
+        /// <summary>
+        /// Просто длинна диагонали
+        /// </summary>
+        /// <param name="lengthTriangle"></param>
+        /// <returns></returns>
         private int getLengthDiagonal(int lengthTriangle)
         {
             int result = 0;
