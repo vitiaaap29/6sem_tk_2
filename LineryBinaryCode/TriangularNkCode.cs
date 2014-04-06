@@ -114,6 +114,11 @@ namespace LineryBinaryCode
             return result;
         }
 
+        /// <summary>
+        /// Длина даигонали дополненного треугольника
+        /// </summary>
+        /// <param name="startSize"></param>
+        /// <returns></returns>
         private int getLengthAddedDiagonal(int startSize)
         {
             int result = 1;
